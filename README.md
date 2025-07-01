@@ -28,7 +28,7 @@ This pipeline provides three main Business Intelligence and Machine Learning use
 
 ## 1. Clone the Repository
 ```bash
-git clone https://github.com/sreejadath/datapipeline-1.git
+git clone https://github.com/eusreeja/delta_pipeline
 cd datapipeline-1
 ```
 
