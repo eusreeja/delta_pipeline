@@ -102,29 +102,7 @@ class PublicPowerIngestion:
         
         return ingestion_job
     
-    def _log_ingestion_metrics(self, start_time: datetime, success: bool, 
-                              country: str, date_range: str, data_size: Optional[int] = None) -> None:
-        """Log comprehensive ingestion metrics"""
-        
-        end_time = datetime.now(pytz.utc)
-        duration = (end_time - start_time).total_seconds()
-        
-        metrics = {
-            'job_id': self.job_id,
-            'endpoint': 'public_power',
-            'country': country,
-            'date_range': date_range,
-            'success': success,
-            'duration_seconds': duration,
-            'start_time': start_time.isoformat(),
-            'end_time': end_time.isoformat()
-        }
-        
-        if data_size is not None:
-            metrics['data_records'] = data_size
-            metrics['records_per_second'] = data_size / duration if duration > 0 else 0
-        
-        self.logger.info(f"Ingestion metrics: {metrics}")
+
     
     def _run_bulk_load(self, **kwargs) -> bool:
         """Run bulk load for historical data"""
@@ -139,11 +117,11 @@ class PublicPowerIngestion:
         
         self.logger.info(f"Bulk load: {start_date} to {end_date}")
         
-        current_date = start_date
+        current_date = datetime.strptime(start_date, "%Y-%m-%d").date()
         
         ingestion_job = self._create_ingestion_job(endpoint, country, current_date)
         
-        while current_date <= end_date:
+        while current_date <= datetime.strptime(end_date, "%Y-%m-%d").date():
             day_start_time = datetime.now(pytz.utc)
             
             try:
@@ -160,14 +138,14 @@ class PublicPowerIngestion:
                     ingestion_job.run(api_data)
                     total_success += 1
                     self.logger.info(f"Successfully ingested data for {current_date}")
-                    self._log_ingestion_metrics(day_start_time, True, country, str(current_date), data_size)
+                   
                 else:
                     self.logger.warning(f"No data found for {current_date}")
-                    self._log_ingestion_metrics(day_start_time, False, country, str(current_date))
+                   
                     
             except Exception as e:
                 self.logger.error(f"Error ingesting data for {current_date}: {str(e)}")
-                self._log_ingestion_metrics(day_start_time, False, country, str(current_date))
+                
                 
             current_date += timedelta(days=1)
         

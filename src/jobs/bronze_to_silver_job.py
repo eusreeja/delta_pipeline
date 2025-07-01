@@ -390,7 +390,7 @@ class BronzeToSilverTransformation:
             silver_df = self._detect_anomalies(silver_df, "electricity_price")
             
             # Remove duplicates before merge
-            partition_cols = ["timestamp", "production_type", "country"]
+            partition_cols = ["timestamp", "country"]
             silver_df = self._deduplicate_records(silver_df, partition_cols)
             
             # Create Silver directory if it doesn't exist
@@ -567,7 +567,7 @@ class BronzeToSilverTransformation:
                  .format("delta")
                  .mode("overwrite")
                  .option("delta.enableChangeDataFeed", "true")
-                 .partitionBy("country", "production_type")
+                 .partitionBy("country", "timestamp")
                  .save(price_path))
 
             # Create empty installed power table

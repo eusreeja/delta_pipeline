@@ -180,7 +180,7 @@ class SilverToGoldTransformation:
 
                 # Optimize table with Z-ordering
                 self.logger.info("Optimizing table with Z-ordering")
-                self.spark.sql(f"OPTIMIZE delta.`{gold_path}` ZORDER BY (production_type_id, country)")
+                self.spark.sql(f"OPTIMIZE `{gold_path}` ZORDER BY (production_type_id, country)")
 
             else:
                 # Create new table with proper schema and partitioning
@@ -363,7 +363,7 @@ class SilverToGoldTransformation:
 
                 # Apply Z-ordering after table creation
                 self.logger.info("Applying Z-ordering for optimal performance")
-                self.spark.sql(f"OPTIMIZE delta.`{gold_fact_power_path}` ZORDER BY (production_type_id, country, year, month)")
+                self.spark.sql(f"OPTIMIZE `{gold_fact_power_path}` ZORDER BY (production_type_id, country, year, month)")
 
             # Verify final gold table
             final_gold_df = self.spark.read.format("delta").load(gold_fact_power_path)
@@ -514,7 +514,7 @@ class SilverToGoldTransformation:
 
                 # Optimize with Z-ordering
                 self.logger.info("Optimizing table with Z-ordering")
-                self.spark.sql(f"OPTIMIZE delta.`{gold_fact_power_30min_agg_path}` ZORDER BY (production_type_id, country, year, month, day)")
+                self.spark.sql(f"OPTIMIZE `{gold_fact_power_30min_agg_path}` ZORDER BY (production_type_id, country, year, month, day)")
 
             else:
                 # Create new table with proper schema and partitioning
@@ -529,7 +529,7 @@ class SilverToGoldTransformation:
 
                 # Apply Z-ordering after table creation
                 self.logger.info("Applying Z-ordering for optimal performance")
-                self.spark.sql(f"OPTIMIZE delta.`{gold_fact_power_30min_agg_path}` ZORDER BY (production_type_id, country, year, month, day)")
+                self.spark.sql(f"OPTIMIZE `{gold_fact_power_30min_agg_path}` ZORDER BY (production_type_id, country, year, month, day)")
 
             # Verify final gold table
             final_gold_agg_df = self.spark.read.format("delta").load(gold_fact_power_30min_agg_path)
