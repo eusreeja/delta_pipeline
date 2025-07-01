@@ -1,0 +1,50 @@
+# config/pipeline_config.yaml
+
+energy_charts_api:
+  # Base API configuration
+  base_url: "https://api.energy-charts.info"
+  
+  # Endpoints configuration
+  endpoints:
+    public_power: "public_power"
+    price: "price"
+    installed_power: "installed_power"
+
+  schedule:
+    public_power_interval_minutes: 15 # Every 15 minutes
+    price_interval_days: 1  # Daily
+    installed_power_interval_monthly: 1  # Monthly
+
+  # Default parameters
+  default_params:
+    country: "de"     # Default country code
+    time_zone: "UTC"  # Default timezone
+    start_date: "2025-01-01"  # Default start date
+    end_date: "2025-01-02"    # Default end date
+  
+  # Request settings
+  request_timeout: 30  # seconds
+  max_retries: 3
+  rate_limit_delay: 1.0  # seconds between requests
+  max_concurrent_requests: 5
+  
+  # Data validation settings
+  validate_responses: true
+  max_response_size_mb: 100
+
+# Delta Lake configuration for storing data
+delta_lake:
+  storage:
+    bronze_path: "delta_lake/bronze/energy_charts"  
+    silver_path: "delta_lake/silver"  
+    gold_path: "delta_lake/gold"  
+  tables:
+    bronze_installed_power: "delta_lake/bronze/energy_charts/de/installed_power"
+    bronze_public_power: "delta_lake/bronze/energy_charts/de/public_power"
+    bronze_price: "delta_lake/bronze/energy_charts/de/price"
+    silver_installed_power: "delta_lake/silver/installed_power"
+    silver_public_power: "delta_lake/silver/public_power"
+    silver_price: "delta_lake/silver/price"
+    gold_dim_production_type: "delta_lake/gold/dim_production_type"
+    gold_fact_power: "delta_lake/gold/prediction_of_underperformance"
+    gold_fact_power_30min_agg: "delta_lake/gold/gold_analysis_of_daily_price"

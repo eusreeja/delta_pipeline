@@ -1,0 +1,8 @@
+# Public Power - daily at every 0:15
+*/15 * * * * root python /app/jobs/public_power_job.py
+
+# Price - daily at 02:00
+0 2 * * * root python /app/jobs/price_job.py
+
+# Installed Power - first of month at 03:00
+0 3 1 * * root python /app/jobs/installed_power_job.py

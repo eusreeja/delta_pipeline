@@ -1,0 +1,28 @@
+# Core Requirements
+pyspark==3.2.0 
+delta-spark==2.0.0 
+requests==2.31.0 
+tenacity==8.2.2
+
+# Configuration & Utilities
+python-dotenv==0.21.1
+pyyaml==6.0.1
+pytz
+
+# Testing & Development
+pytest==7.1.3
+pytest-spark==0.6.0
+
+# Analyse
+numpy==1.21.6
+# matplotlib==3.2.2  # Temporarily disabled due to build issues with Python 3.7
+jupyterlab==3.4.8
+ipykernel==6.15.3
+
+# Development Tools (Optional)
+pylint==2.17.4
+
+# Cloud Storage (Optional - uncomment as needed)
+# boto3==1.28.57  # For S3
+# adlfs==2023.6.0  # For Azure Data Lake
+# gcsfs==2023.6.0  # For Google Cloud Storage
