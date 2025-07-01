@@ -115,10 +115,7 @@ docker-compose exec datapipeline-app python src/main.py --job report --config co
 ```
 or 
 
-# Quick start (everything automated)
-./run_bi_ml_demo.sh
-
-# Or step by step
+# Quick start 
 docker-compose up -d
 docker-compose exec datapipeline-app python src/main.py --job demo --config config/pipeline_config.yaml
 docker-compose exec datapipeline-app python src/main.py --job report --config config/pipeline_config.yaml
