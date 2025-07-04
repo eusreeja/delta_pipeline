@@ -20,7 +20,7 @@ energy_charts_api:
     country: "de"     # Default country code
     time_zone: "UTC"  # Default timezone
     start_date: "2025-01-01"  # Default start date
-    end_date: "2025-01-02"    # Default end date
+    end_date: "2025-03-31"    # Default end date
   
   # Request settings
   request_timeout: 30  # seconds
@@ -46,5 +46,5 @@ delta_lake:
     silver_public_power: "delta_lake/silver/public_power"
     silver_price: "delta_lake/silver/price"
     gold_dim_production_type: "delta_lake/gold/dim_production_type"
-    gold_fact_power: "delta_lake/gold/prediction_of_underperformance"
-    gold_fact_power_30min_agg: "delta_lake/gold/gold_analysis_of_daily_price"
+    gold_fact_power: "delta_lake/gold/fact_power"
+    gold_fact_power_30min_agg: "delta_lake/gold/fact_power_30min_agg"

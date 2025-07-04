@@ -110,7 +110,8 @@ class SilverToGoldTransformation:
                 .distinct()
             )
 
-            self.logger.info(f"Found {distinct_prod_types.count()} distinct production types")
+            initial_count = distinct_prod_types.count()
+            self.logger.info(f"Found {initial_count} distinct production types")
 
             # Map production attributes using UDF
             from pyspark.sql.functions import udf
@@ -143,6 +144,15 @@ class SilverToGoldTransformation:
                 lit(None).cast(TimestampType()).alias("updated_at")
             )
 
+            # Ensure no duplicate production_type_id values before merge
+            # This is critical to prevent "multiple source rows matched" errors
+            gold_df = gold_df.dropDuplicates(["production_type_id"])
+            final_count = gold_df.count()
+            self.logger.info(f"After deduplication: {final_count} unique production type records")
+            
+            if final_count != initial_count:
+                self.logger.warning(f"Removed {initial_count - final_count} duplicate records during deduplication")
+
             # Create Gold directory if it doesn't exist
             Path(gold_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -161,41 +171,66 @@ class SilverToGoldTransformation:
                 
                 # Perform merge operation - SCD Type 1 (update in place)
                 self.logger.info("Performing MERGE operation on gold dim_production_type table")
-                (delta_table.alias("target")
-                 .merge(
-                     gold_df.alias("source"),
-                     "target.production_type_id = source.production_type_id"
-                 )
-                 .whenMatchedUpdate(set={
-                     "production_type": "source.production_type",
-                     "energy_category": "source.energy_category",
-                     "controllability_type": "source.controllability_type",
-                     "description": "source.description",
-                     "country": "source.country",
-                     "active_flag": "source.active_flag",
-                     "updated_at": "current_timestamp()"
-                 })
-                 .whenNotMatchedInsertAll()
-                 .execute())
+                try:
+                    (delta_table.alias("target")
+                     .merge(
+                         gold_df.alias("source"),
+                         "target.production_type_id = source.production_type_id"
+                     )
+                     .whenMatchedUpdate(set={
+                         "production_type": "source.production_type",
+                         "energy_category": "source.energy_category",
+                         "controllability_type": "source.controllability_type",
+                         "description": "source.description",
+                         "country": "source.country",
+                         "active_flag": "source.active_flag",
+                         "updated_at": "current_timestamp()"
+                     })
+                     .whenNotMatchedInsertAll()
+                     .execute())
+                    self.logger.info("MERGE operation completed successfully")
+                except Exception as merge_error:
+                    self.logger.error(f"MERGE operation failed: {str(merge_error)}")
+                    raise
 
                 # Optimize table with Z-ordering
-                self.logger.info("Optimizing table with Z-ordering")
-                self.spark.sql(f"OPTIMIZE `{gold_path}` ZORDER BY (production_type_id, country)")
+                try:
+                    self.logger.info("Optimizing table with Z-ordering")
+                    self.spark.sql(f"OPTIMIZE delta.`{gold_path}` ZORDER BY (production_type_id, country)")
+                except Exception as e:
+                    self.logger.warning(f"Could not optimize table: {str(e)}")
 
             else:
                 # Create new table with proper schema and partitioning
                 self.logger.info(f"Creating new gold dim_production_type table at: {gold_path}")
-                (gold_df.write
-                 .format("delta")
-                 .mode("overwrite")
-                 .option("overwriteSchema", "true")
-                 .option("delta.enableChangeDataFeed", "true")
-                 .partitionBy("country")
-                 .save(gold_path))
+                try:
+                    (gold_df.write
+                     .format("delta")
+                     .mode("overwrite")
+                     .option("overwriteSchema", "true")
+                     .option("delta.enableChangeDataFeed", "true")
+                     .partitionBy("country")
+                     .save(gold_path))
+                    self.logger.info("Table created successfully")
+                except Exception as create_error:
+                    self.logger.error(f"Failed to create table: {str(create_error)}")
+                    raise
+
+                # Verify table exists before optimization
+                try:
+                    test_df = self.spark.read.format("delta").load(gold_path)
+                    record_count = test_df.count()
+                    self.logger.info(f"Table verification successful with {record_count} records")
+                except Exception as verify_error:
+                    self.logger.error(f"Table verification failed: {str(verify_error)}")
+                    raise
 
                 # Apply Z-ordering after table creation
-                self.logger.info("Applying Z-ordering for optimal performance")
-                self.spark.sql(f"OPTIMIZE delta.`{gold_path}` ZORDER BY (production_type_id, country)")
+                try:
+                    self.logger.info("Applying Z-ordering for optimal performance")
+                    self.spark.sql(f"OPTIMIZE delta.`{gold_path}` ZORDER BY (production_type_id, country)")
+                except Exception as e:
+                    self.logger.warning(f"Could not optimize table: {str(e)}")
 
             # Verify final gold table
             final_gold_df = self.spark.read.format("delta").load(gold_path)
@@ -305,6 +340,17 @@ class SilverToGoldTransformation:
                 current_timestamp().alias("updated_at")
             ).filter(col("production_type_id").isNotNull())  # Filter out records without production_type_id
 
+            # Remove duplicates based on record_id to prevent merge conflicts
+            self.logger.info("Removing duplicates based on record_id")
+            initial_count = gold_fact_df.count()
+            gold_fact_df = gold_fact_df.dropDuplicates(["record_id"])
+            final_count = gold_fact_df.count()
+            
+            if initial_count != final_count:
+                self.logger.warning(f"Removed {initial_count - final_count} duplicate records based on record_id")
+            
+            self.logger.info(f"Processing {final_count} unique records for gold_fact_power")
+
             # Create Gold directory if it doesn't exist
             Path(gold_fact_power_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -347,8 +393,11 @@ class SilverToGoldTransformation:
                  .execute())
 
                 # Optimize with Z-ordering
-                self.logger.info("Optimizing table with Z-ordering")
-                self.spark.sql(f"OPTIMIZE delta.`{gold_fact_power_path}` ZORDER BY (production_type_id, country, year, month)")
+                try:
+                    self.logger.info("Optimizing table with Z-ordering")
+                    self.spark.sql(f"OPTIMIZE delta.`{gold_fact_power_path}` ZORDER BY (production_type_id, country, year, month)")
+                except Exception as e:
+                    self.logger.warning(f"Could not optimize table: {str(e)}")
 
             else:
                 # Create new table with proper schema and partitioning
@@ -362,8 +411,11 @@ class SilverToGoldTransformation:
                  .save(gold_fact_power_path))
 
                 # Apply Z-ordering after table creation
-                self.logger.info("Applying Z-ordering for optimal performance")
-                self.spark.sql(f"OPTIMIZE `{gold_fact_power_path}` ZORDER BY (production_type_id, country, year, month)")
+                try:
+                    self.logger.info("Applying Z-ordering for optimal performance")
+                    self.spark.sql(f"OPTIMIZE delta.`{gold_fact_power_path}` ZORDER BY (production_type_id, country, year, month)")
+                except Exception as e:
+                    self.logger.warning(f"Could not optimize table: {str(e)}")
 
             # Verify final gold table
             final_gold_df = self.spark.read.format("delta").load(gold_fact_power_path)
@@ -513,8 +565,11 @@ class SilverToGoldTransformation:
                  .execute())
 
                 # Optimize with Z-ordering
-                self.logger.info("Optimizing table with Z-ordering")
-                self.spark.sql(f"OPTIMIZE `{gold_fact_power_30min_agg_path}` ZORDER BY (production_type_id, country, year, month, day)")
+                try:
+                    self.logger.info("Optimizing table with Z-ordering")
+                    self.spark.sql(f"OPTIMIZE delta.`{gold_fact_power_30min_agg_path}` ZORDER BY (production_type_id, country, year, month, day)")
+                except Exception as e:
+                    self.logger.warning(f"Could not optimize table: {str(e)}")
 
             else:
                 # Create new table with proper schema and partitioning
@@ -528,8 +583,11 @@ class SilverToGoldTransformation:
                  .save(gold_fact_power_30min_agg_path))
 
                 # Apply Z-ordering after table creation
-                self.logger.info("Applying Z-ordering for optimal performance")
-                self.spark.sql(f"OPTIMIZE `{gold_fact_power_30min_agg_path}` ZORDER BY (production_type_id, country, year, month, day)")
+                try:
+                    self.logger.info("Applying Z-ordering for optimal performance")
+                    self.spark.sql(f"OPTIMIZE delta.`{gold_fact_power_30min_agg_path}` ZORDER BY (production_type_id, country, year, month, day)")
+                except Exception as e:
+                    self.logger.warning(f"Could not optimize table: {str(e)}")
 
             # Verify final gold table
             final_gold_agg_df = self.spark.read.format("delta").load(gold_fact_power_30min_agg_path)

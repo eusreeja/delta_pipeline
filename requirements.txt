@@ -15,7 +15,9 @@ pytest-spark==0.6.0
 
 # Analyse
 numpy==1.21.6
-# matplotlib==3.2.2  # Temporarily disabled due to build issues with Python 3.7
+plotly==5.17.0
+seaborn==0.12.2
+matplotlib==3.7.1
 jupyterlab==3.4.8
 ipykernel==6.15.3
 

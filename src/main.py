@@ -32,27 +32,20 @@ from src.jobs.silver_to_gold_job import (
 
 def init_spark():
     """Initialize Spark with basic configuration"""
-    return  (SparkSession.builder.master("local[*]")
+    return (SparkSession.builder.master("local[*]")
+    .appName("DataPipeline")
     .config("spark.jars.packages", "io.delta:delta-core_2.12:2.0.0")
     .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension")
     .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
     .config("spark.delta.logStore.class", "org.apache.spark.sql.delta.storage.S3SingleDriverLogStore")
+    .config("spark.sql.warehouse.dir", "./delta_lake")  # Local directory for Delta Lake
     .config("spark.driver.memory", "4g")  # Increase to 4GB
     .config("spark.driver.maxResultSize", "2g")
     .config("spark.sql.shuffle.partitions", "200")  # Reduce shuffle partitions
     .config("spark.sql.autoBroadcastJoinThreshold", "10485760")  # 10MB
     .config("spark.executor.memory", "4g")  # If using executors
+    .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
     .getOrCreate())
-"""
-    return SparkSession.builder \
-        .appName("DataPipeline") \
-        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
-        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog") \
-        .config("spark.sql.warehouse.dir", "./spark-warehouse") \
-        .config("spark.driver.memory", "2g") \
-        .config("spark.executor.memory", "2g") \
-        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
-        .getOrCreate()"""
 def init_energy_charts_connector(endpoint, logger, config):
     """Initialize EnergyChartsConnector with endpoint, logger, and config"""
     # Restructure config for the connector
@@ -129,7 +122,7 @@ def main():
             # Automatically run Bronze to Silver transformation after ingestion
             if args.layer in ["silver", "all"]:
                 logger.info("main: Starting Bronze to Silver transformation for public power")
-                run_public_power_bronze_to_silver(spark, logger, config, country)
+                run_public_power_bronze_to_silver(spark, logger, job_id, config, country)
                 logger.info("main: Public power Bronze to Silver transformation completed")
             
         elif args.job == "price":
@@ -153,7 +146,7 @@ def main():
             # Automatically run Bronze to Silver transformation after ingestion
             if args.layer in ["silver", "all"]:
                 logger.info("main: Starting Bronze to Silver transformation for price")
-                run_price_bronze_to_silver(spark, logger, config, country)
+                run_price_bronze_to_silver(spark, logger, job_id, config, country)
                 logger.info("main: Price Bronze to Silver transformation completed")
         
         
@@ -280,10 +273,10 @@ def main():
             
         else:
             logger.error(f"main: Unknown job: {args.job}")
-            logger.error("main: Available jobs: public_power, price, installed_power, \
-                        bronze_to_silver_public_power, bronze_to_silver_price, bronze_to_silver_installed_power, bronze_to_silver_all,\
-                        gold_dim_production_type, gold_fact_power,gold_fact_power_30min_agg, silver_to_gold_all \
-                        demo , ")
+            logger.error("main: Available jobs: public_power, price, installed_power, "
+                        "bronze_to_silver_public_power, bronze_to_silver_price, bronze_to_silver_installed_power, bronze_to_silver_all, "
+                        "gold_dim_production_type, gold_fact_power, gold_fact_power_30min_agg, silver_to_gold_all, "
+                        "demo")
             sys.exit(1) 
     except Exception as e:
         print(f"main: An error occurred: {str(e)}")
